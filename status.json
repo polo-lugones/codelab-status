@@ -1,1 +1,1 @@
-{"updated": "2026-07-30T22:11:10Z", "checks": [], "history": []}
+{"updated":"2026-07-30T22:17:43Z","checks":[{"name":"front","ok":true,"ms":760},{"name":"api","ok":true,"ms":406},{"name":"db","ok":true,"ms":0}],"history":[{"at":"2026-07-30T22:17:43Z","checks":[{"name":"front","ok":true,"ms":760},{"name":"api","ok":true,"ms":406},{"name":"db","ok":true,"ms":0}]}]}
