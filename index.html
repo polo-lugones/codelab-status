@@ -29,6 +29,12 @@
     footer { text-align: center; color: var(--muted); font-size: 12.5px; padding: 18px 0 26px; }
     footer a { color: #8ea2ff; text-decoration: none; }
     .err { background: var(--panel); border: 1px solid var(--warn); border-radius: 12px; padding: 14px 18px; color: var(--muted); }
+    .notice { display: flex; gap: 12px; align-items: flex-start; border-radius: 14px; padding: 14px 18px; margin-bottom: 18px; border: 1px solid; }
+    .notice .n-ic { font-size: 20px; }
+    .notice .n-body strong { display: block; margin-bottom: 2px; }
+    .notice .n-since { color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .notice.maintenance, .notice.info { background: rgba(245, 158, 11, .08); border-color: var(--warn); }
+    .notice.incident { background: rgba(239, 68, 68, .1); border-color: var(--bad); }
     @media (prefers-color-scheme: light) { :root { --bg: #f4f6fb; --panel: #ffffff; --line: #dde3f0; --fg: #101828; --muted: #5b6b85; } .bar { background: #e3e9f5; } }
   </style>
 </head>
@@ -36,6 +42,7 @@
   <main>
     <h1>🤖 Robtec CodeLab — Estado</h1>
     <p class="sub">Monitoreo automático desde infraestructura independiente. Se actualiza cada 30 minutos.</p>
+    <div id="notice"></div>
     <div class="overall"><span class="dot" id="overall-dot"></span><span id="overall-text">Cargando estado…</span></div>
     <div id="services"></div>
     <p class="updated" id="updated"></p>
@@ -44,6 +51,16 @@
   <script>
     const NOMBRES = { front: "Plataforma (codelab.robtec.dev)", api: "API (api-codelab.robtec.dev)", db: "Base de datos" };
     function pinta(d) {
+      const nd = document.getElementById("notice");
+      if (d.notice && d.notice.message) {
+        const ICONO = { maintenance: "🛠️", incident: "🚨", info: "ℹ️" };
+        const TITULO = { maintenance: "Mantenimiento programado", incident: "Incidente en curso", info: "Aviso" };
+        const desde = new Date(d.notice.since).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+        nd.innerHTML = `<div class="notice ${d.notice.type}"><span class="n-ic">${ICONO[d.notice.type] || "ℹ️"}</span><div class="n-body"><strong>${TITULO[d.notice.type] || "Aviso"}</strong><span></span><div class="n-since">Publicado el ${desde}</div></div></div>`;
+        nd.querySelector(".n-body span").textContent = d.notice.message;
+      } else {
+        nd.innerHTML = "";
+      }
       const servicios = d.checks || [];
       const todoOk = servicios.every((s) => s.ok);
       const dot = document.getElementById("overall-dot");
