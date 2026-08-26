@@ -1,0 +1,51 @@
+# Aviso manual en la página (mantenimiento/incidente/info). Se dispara a mano:
+# Actions → "Status incident" → Run workflow.
+name: Status incident
+
+on:
+  workflow_dispatch:
+    inputs:
+      accion:
+        description: "Publicar (set) o retirar (clear) el aviso"
+        type: choice
+        options: [set, clear]
+        default: set
+      tipo:
+        description: "Tipo de aviso"
+        type: choice
+        options: [maintenance, incident, info]
+        default: maintenance
+      mensaje:
+        description: "Mensaje visible"
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Actualizar el aviso
+        env:
+          ACCION: ${{ inputs.accion }}
+          TIPO: ${{ inputs.tipo }}
+          MENSAJE: ${{ inputs.mensaje }}
+        run: |
+          if [ "$ACCION" = "set" ] && [ -z "$MENSAJE" ]; then
+            echo "::error::Para publicar un aviso escribí el mensaje."; exit 1
+          fi
+          NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ) node -e '
+            const fs = require("fs");
+            const d = JSON.parse(fs.readFileSync("status.json", "utf8"));
+            if (process.env.ACCION === "clear") delete d.notice;
+            else d.notice = { type: process.env.TIPO, message: process.env.MENSAJE.slice(0, 300), since: process.env.NOW };
+            fs.writeFileSync("status.json", JSON.stringify(d));
+          '
+          git config user.name "status-bot"
+          git config user.email "noreply@robtec.dev"
+          git add status.json
+          git commit -q -m "aviso: $ACCION $TIPO" || exit 0
+          git push -q

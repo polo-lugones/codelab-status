@@ -1,0 +1,61 @@
+# Chequeos de estado (viven en ESTE repo público: los minutos de Actions en
+# repos públicos son gratis e ilimitados, así el monitoreo no depende de la
+# cuota del repo privado). Cada 2 horas: front, API y DB de CodeLab; escribe
+# status.json acá mismo con GITHUB_TOKEN (sin deploy keys).
+name: Status checks
+
+on:
+  schedule:
+    - cron: "23 */2 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Chequear servicios
+        id: c
+        run: |
+          medir() { # $1 nombre, $2 url, $3 modo (front|health)
+            local ini fin ms code ok
+            ini=$(date +%s%3N)
+            code=$(curl -s -m 15 -o /dev/null -w "%{http_code}" "$2" || echo 000)
+            fin=$(date +%s%3N)
+            ms=$((fin - ini))
+            case "$3:$code" in
+              front:200|front:301|front:302|front:401|front:403) ok=true ;;
+              health:200) ok=true ;;
+              *) ok=false ;;
+            esac
+            echo "{\"name\":\"$1\",\"ok\":$ok,\"ms\":$ms}"
+          }
+          F=$(medir front "https://codelab.robtec.dev/" front)
+          A=$(medir api "https://api-codelab.robtec.dev/health.php" health)
+          DBOK=$(curl -s -m 15 "https://api-codelab.robtec.dev/health.php" | grep -o '"db":true' || true)
+          [ -n "$DBOK" ] && D='{"name":"db","ok":true,"ms":0}' || D='{"name":"db","ok":false,"ms":0}'
+          echo "checks=[$F,$A,$D]" >> "$GITHUB_OUTPUT"
+
+      - name: Publicar
+        env:
+          CHECKS: ${{ steps.c.outputs.checks }}
+        run: |
+          NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          NOW="$NOW" node -e '
+            const fs = require("fs");
+            const prev = JSON.parse(fs.readFileSync("status.json", "utf8"));
+            const checks = JSON.parse(process.env.CHECKS);
+            const history = [...(prev.history || []), { at: process.env.NOW, checks }].slice(-48);
+            const out = { updated: process.env.NOW, checks, history };
+            if (prev.notice) out.notice = prev.notice;
+            fs.writeFileSync("status.json", JSON.stringify(out));
+          '
+          git config user.name "status-bot"
+          git config user.email "noreply@robtec.dev"
+          git add status.json
+          git commit -q -m "status: $NOW" || exit 0
+          git push -q
